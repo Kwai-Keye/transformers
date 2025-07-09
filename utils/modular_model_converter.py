@@ -429,6 +429,9 @@ class SuperTransformer(cst.CSTTransformer):
         for i, expr in enumerate(node.body):
             if is_call_to_super(expr, func_name):
                 has_super_call = True
+                print(111223243)
+                print(func_name)
+                print(self.original_methods)
                 new_body.extend(self.update_body(self.original_methods[func_name].body.body, node.body[i + 1 :]))
                 new_body = self._fix_init_location(new_body)
             else:
@@ -452,6 +455,7 @@ class SuperTransformer(cst.CSTTransformer):
     def leave_FunctionDef(self, original_node: cst.Call, updated_node: cst.Call) -> cst.CSTNode:
         if updated_node.name.value in self.updated_methods:
             name = updated_node.name.value
+            print("self.replace_super_calls", updated_node.body, name)
             new_body = self.replace_super_calls(updated_node.body, name)
             return updated_node.with_changes(body=new_body, params=updated_node.params)
         return updated_node
@@ -1115,6 +1119,8 @@ def replace_class_node(
     result_node = original_node.with_changes(body=cst.IndentedBlock(body=end_meth))
     temp_module = cst.Module(body=[result_node])
     new_module = MetadataWrapper(temp_module)
+
+    print("new_replacement_class", original_methods, updated_methods)
     new_replacement_class = new_module.visit(
         SuperTransformer(temp_module, original_methods, updated_methods, all_bases)
     )
@@ -1723,6 +1729,7 @@ def create_modules(modular_mapper: ModularFileMapper) -> dict[str, cst.Module]:
 
 
 def convert_modular_file(modular_file):
+    print("convert_modular_fileconvert_modular_file")
     pattern = re.search(r"modular_(.*)(?=\.py$)", modular_file)
     output = {}
     if pattern is not None:
@@ -1735,6 +1742,7 @@ def convert_modular_file(modular_file):
         cst_transformers = ModularFileMapper(module, model_name)
         wrapper.visit(cst_transformers)
         for file, module in create_modules(cst_transformers).items():
+            # print(file, module, file, module)
             if module != {}:
                 # Get relative path starting from src/transformers/
                 relative_path = re.search(
@@ -1754,6 +1762,11 @@ def convert_modular_file(modular_file):
 
 
 def save_modeling_file(modular_file, converted_file):
+    #print("save_modeling_file", "=" * 100)
+    #for k, v in converted_file.items():
+    #    print("\nkkkkkkkkkk", k, '\n')
+    #    for vi in v:
+    #        print(vi)
     for file_type in converted_file.keys():
         file_name_prefix = file_type.split("*")[0]
         file_name_suffix = file_type.split("*")[-1] if "*" in file_type else ""
@@ -1814,10 +1827,13 @@ if __name__ == "__main__":
                 files_to_parse[i] = full_path
 
     priority_list, _ = find_priority_list(files_to_parse)
+    #print(priority_list)
+    #print(files_to_parse)
     assert len(priority_list) == len(files_to_parse), "Some files will not be converted"
 
     for file_name in priority_list:
-        print(f"Converting {file_name} to a single model single file format")
+        # print(f"Converting {file_name} to a single model single file format")
         module_path = file_name.replace("/", ".").replace(".py", "").replace("src.", "")
         converted_files = convert_modular_file(file_name)
+        #print("converted_files\n", json.dumps(converted_files, indent=4))
         converter = save_modeling_file(file_name, converted_files)
